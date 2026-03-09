@@ -52,7 +52,7 @@ region_map <- c(
   "Philippines" = "Asia and Pacific",
   "Indonesia" = "Asia and Pacific",
   "Vietnam" = "Asia and Pacific",
-  
+
   # Europe and Central Asia
   "Latvia" = "Europe and Central Asia",
   "Lithuania" = "Europe and Central Asia",
@@ -72,7 +72,7 @@ region_map <- c(
   "Tajikistan" = "Europe and Central Asia",
   "Turkey" = "Europe and Central Asia",
   "Cyprus" = "Europe and Central Asia",
-  
+
   # Latin America and Caribbean
   "Venezuela, RB" = "Latin America and Caribbean",
   "Argentina" = "Latin America and Caribbean",
@@ -100,7 +100,7 @@ region_map <- c(
   "Haiti" = "Latin America and Caribbean",
   "Suriname" = "Latin America and Caribbean",
   "Bahamas" = "Latin America and Caribbean",
-  
+
   # Middle East and North Africa
   "Saudi Arabia" = "Middle East and North Africa",
   "Qatar" = "Middle East and North Africa",
@@ -120,7 +120,7 @@ region_map <- c(
   "United Arab Emirates" = "Middle East and North Africa",
   "Djibouti" = "Middle East and North Africa",
   "Yemen, Rep." = "Middle East and North Africa",
-  
+
   # South Asia
   "India" = "South Asia",
   "Pakistan" = "South Asia",
@@ -129,7 +129,7 @@ region_map <- c(
   "Nepal" = "South Asia",
   "Bhutan" = "South Asia",
   "Afghanistan" = "South Asia",
-  
+
   # Sub-Saharan Africa
   "Comoros" = "Sub-Saharan Africa",
   "Botswana" = "Sub-Saharan Africa",
@@ -195,18 +195,48 @@ conflict_long <- conflict |>
     has_interstate = as.integer(Type == 3)
   )
 
-# Merge onto panel
 panel <- panel |>
   left_join(conflict_long, by = c("country", "year")) |>
   mutate(
     has_conflict = replace_na(has_conflict, 0),
     has_intrastate = replace_na(has_intrastate, 0),
     has_interstate = replace_na(has_interstate, 0)
-  ) |> 
+  ) |>
   select(-Type)
 
+# Generate food aid received
+food_aid <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/US Food Aid - foodaid.csv") |>
+  rename(country = `Recipient Country`, year = Year, wheat_aid = Value) |>
+  select(country, year, wheat_aid)
+
+# Merge onto panel
+panel <- panel |>
+  left_join(food_aid, by = c("country", "year")) |>
+  mutate(wheat_aid = replace_na(wheat_aid, 0))
+
+# Generate population
+population <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/World Population - worldbankpop.csv") |>
+  rename(country = `Country Name`) |>
+  select(country, `1971 [YR1971]`:`2006 [YR2006]`) |>
+  pivot_longer(
+    cols = `1971 [YR1971]`:`2006 [YR2006]`,
+    names_to = "year",
+    values_to = "population"
+  ) |>
+  mutate(
+    year = as.integer(str_extract(year, "\\d{4}")),
+    population = as.numeric(population),
+    country = case_when(
+      country == "Russian Federation" ~ "Russia",
+      TRUE ~ country
+    )
+  )
+
+panel <- panel |>
+  left_join(population, by = c("country", "year"))
+
 # Generate real GDP per capita
-GDPPC <- read_excel("C:/Users/aditr/Downloads/Replication Exercise 2/API_NY.GDP.PCAP.CD_DS2_en_excel_v2_281.xls", skip=3)
+GDPPC <- read_excel("C:/Users/aditr/Downloads/Replication Exercise 2/API_NY.GDP.PCAP.CD_DS2_en_excel_v2_281.xls", skip = 3)
 
 GDPPC_long <- GDPPC |>
   select(`Country Name`, `1971`:`2006`) |>
@@ -229,10 +259,55 @@ oil_price <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/oil-price
 panel <- panel |>
   left_join(oil_price, by = "year")
 
-# Generate average annual amount of per capita net imports of cereals from 1971 to 2006
+# Generate average per capita net imports of cereal
+cereal <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/Average Recipient Cereal - globalcereal_importexport.csv") |>
+  rename(country = Area, year = Year, m49 = `Area Code (M49)`, element = Element, value = Value) |>
+  mutate(country = case_when(
+    m49 == 68 ~ "Bolivia",
+    m49 == 364 ~ "Iran, Islamic Rep.",
+    m49 == 862 ~ "Venezuela, RB",
+    TRUE ~ country
+  )) |>
+  filter(year >= 1971, year <= 2006) |>
+  select(country, year, element, value)
 
-# Generate average per capita production of cereals'
+cereal_net_imports <- cereal |>
+  mutate(signed_value = if_else(element == "Export Quantity", -value, value)) |>
+  group_by(country, year) |>
+  summarise(net_imports_cereals = sum(signed_value, na.rm = TRUE), .groups = "drop")
 
-print(panel |> slice_sample(n = 10))
+panel <- panel |>
+  left_join(cereal_net_imports, by = c("country", "year")) |>
+  mutate(net_imports_cereals = replace_na(net_imports_cereals, 0)) |>
+  group_by(country) |>
+  mutate(avg_net_imports_cereals_pc = mean(net_imports_cereals / population, na.rm = TRUE)) |>
+  ungroup() |>
+  select(-net_imports_cereals)
 
+# Generate average per capita cereal production
+cereal_prod <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/Average Recipient Cereal - globalcerealprod.csv") |>
+  rename(country = Area, year = Year, m49 = `Area Code (M49)`, cereal_prod = Value) |>
+  mutate(country = case_when(
+    m49 == 68 ~ "Bolivia",
+    m49 == 364 ~ "Iran, Islamic Rep.",
+    m49 == 862 ~ "Venezuela, RB",
+    TRUE ~ country
+  )) |>
+  filter(year >= 1971, year <= 2006) |>
+  select(country, year, cereal_prod)
 
+cereal_prod_pc <- cereal_prod |>
+  left_join(population, by = c("country", "year")) |>
+  group_by(country) |>
+  summarise(avg_cereal_prod_pc = mean(cereal_prod / population, na.rm = TRUE)) |>
+  ungroup()
+
+# Merge onto panel
+panel <- panel |>
+  left_join(cereal_prod_pc, by = "country") |>
+  mutate(avg_cereal_prod_pc = replace_na(avg_cereal_prod_pc, 0))
+
+# Sanity check
+panel |>
+  slice_sample(n = 10) |>
+  print(width = Inf)
