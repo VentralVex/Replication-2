@@ -209,10 +209,25 @@ food_aid <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/US Food Ai
   rename(country = `Recipient Country`, year = Year, wheat_aid = Value) |>
   select(country, year, wheat_aid)
 
-# Merge onto panel
 panel <- panel |>
   left_join(food_aid, by = c("country", "year")) |>
   mutate(wheat_aid = replace_na(wheat_aid, 0))
+
+# Generate US wheat production data
+us_wheat_prod <- read_csv(
+  "C:/Users/aditr/Downloads/Replication Exercise 2/US Annual Wheat Production - WheatYearbookTable04-Full.csv",
+  skip = 1
+) |>
+  rename(year = `Marketing year\n1/`, us_wheat_prod = `U.S. production million bushels`) |>
+  select(year, us_wheat_prod) |>
+  mutate(
+    year = as.integer(year),
+    us_wheat_prod = as.numeric(str_remove_all(us_wheat_prod, ","))
+  ) |>
+  filter(year >= 1971, year <= 2006)
+
+panel <- panel |>
+  left_join(us_wheat_prod, by = "year")
 
 # Generate population
 population <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/World Population - worldbankpop.csv") |>
