@@ -1,0 +1,35 @@
+\documentclass{article}
+\usepackage{adjustbox}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\title{Replication 2 Tables}
+\begin{document}
+
+\begin{table}[h]
+\centering
+\small
+\textit{Panel A. OLS estimates}\\
+\begin{adjustbox}{max width=\textwidth}
+    \input{table2_panelA.tex}
+\end{adjustbox}
+
+\vspace{1em}
+\textit{Panel B. Reduced form estimates}\\
+\begin{adjustbox}{max width=\textwidth}
+    \input{table2_panelB.tex}
+\end{adjustbox}
+
+\vspace{1em}
+\textit{Panel C. 2SLS estimates}\\
+\begin{adjustbox}{max width=\textwidth}
+    \input{table2_panelC.tex}
+\end{adjustbox}
+
+\vspace{1em}
+\textit{Panel D. First-stage estimates}\\
+\begin{adjustbox}{max width=\textwidth}
+    \input{table2_panelD.tex}
+\end{adjustbox}
+\end{table}
+
+\end{document}
