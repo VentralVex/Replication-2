@@ -351,10 +351,27 @@ cereal_prod_pc <- cereal_prod |>
   summarise(avg_cereal_prod_pc = mean(cereal_prod / population, na.rm = TRUE)) |>
   ungroup()
 
-# Merge onto panel
 panel <- panel |>
   left_join(cereal_prod_pc, by = "country") |>
   mutate(avg_cereal_prod_pc = replace_na(avg_cereal_prod_pc, 0))
+
+
+# Drop null observations
+panel <- panel |>
+  drop_na()
+
+# Generate rye production
+us_rye_prod <- read_csv(
+  "/Users/aditpakala/Downloads/Replication 2/US Annual Wheat Production - WheatYearbookTable02-Full.csv",
+  skip = 3,
+  col_names = c("year", "planted_acres", "harvested_acres", "us_rye_prod", "yield", "farm_price")
+) |>
+  select(year, us_rye_prod) |>
+  mutate(
+    year = as.integer(str_extract(year, "^\\d{4}")),
+    us_rye_prod = as.numeric(str_remove_all(us_rye_prod, ","))
+  ) |>
+  filter(!is.na(year), year >= 1971, year <= 2006)
 
 # Sanity check
 panel |>
