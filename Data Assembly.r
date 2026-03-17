@@ -213,6 +213,12 @@ panel <- panel |>
   left_join(food_aid, by = c("country", "year")) |>
   mutate(wheat_aid = replace_na(wheat_aid, 0))
 
+# Generate avg. probability of food aid
+panel <- panel |>
+  group_by(country) |>
+  mutate(avg_prob_food_aid = sum(wheat_aid > 0, na.rm = TRUE) / 36) |>
+  ungroup()
+
 # Generate US wheat production data
 us_wheat_prod <- read_csv(
   "/Users/aditpakala/Downloads/Replication 2/US Annual Wheat Production - WheatYearbookTable04-Full.csv",
