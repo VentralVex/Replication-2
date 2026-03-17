@@ -377,3 +377,8 @@ us_rye_prod <- read_csv(
 panel |>
   slice_sample(n = 10) |>
   print(width = Inf)
+
+# Export to Stata
+library(haven)
+
+write_dta(panel, "/Users/aditpakala/Downloads/Replication 2/panel.dta")
