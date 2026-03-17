@@ -180,7 +180,7 @@ panel <- panel |>
   mutate(region = region_map[country])
 
 # Import conflict data
-conflict <- read_excel("C:/Users/aditr/Downloads/Replication Exercise 2/2010_c_666956-l_1-k_ucdp_prio_armedconflictdataset_v4_2010.xls")
+conflict <- read_excel("/Users/aditpakala/Downloads/Replication 2/2010_c_666956-l_1-k_ucdp_prio_armedconflictdataset_v4_2010.xls")
 
 # Reshape and create conflict indicators
 conflict_long <- conflict |>
@@ -205,7 +205,7 @@ panel <- panel |>
   select(-Type)
 
 # Generate food aid received
-food_aid <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/US Food Aid - foodaid.csv") |>
+food_aid <- read_csv("/Users/aditpakala/Downloads/Replication 2/US Food Aid - foodaid.csv") |>
   rename(country = `Recipient Country`, year = Year, wheat_aid = Value) |>
   select(country, year, wheat_aid)
 
@@ -215,7 +215,7 @@ panel <- panel |>
 
 # Generate US wheat production data
 us_wheat_prod <- read_csv(
-  "C:/Users/aditr/Downloads/Replication Exercise 2/US Annual Wheat Production - WheatYearbookTable04-Full.csv",
+  "/Users/aditpakala/Downloads/Replication 2/US Annual Wheat Production - WheatYearbookTable04-Full.csv",
   skip = 1
 ) |>
   rename(year = `Marketing year\n1/`, us_wheat_prod = `U.S. production million bushels`) |>
@@ -230,7 +230,7 @@ panel <- panel |>
   left_join(us_wheat_prod, by = "year")
 
 # Generate population
-population <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/World Population - worldbankpop.csv") |>
+population <- read_csv("/Users/aditpakala/Downloads/Replication 2/World Population - worldbankpop.csv") |>
   rename(country = `Country Name`) |>
   select(country, `1971 [YR1971]`:`2006 [YR2006]`) |>
   pivot_longer(
@@ -251,7 +251,7 @@ panel <- panel |>
   left_join(population, by = c("country", "year"))
 
 # Generate real GDP per capita
-GDPPC <- read_excel("C:/Users/aditr/Downloads/Replication Exercise 2/API_NY.GDP.PCAP.CD_DS2_en_excel_v2_281.xls", skip = 3)
+GDPPC <- read_excel("/Users/aditpakala/Downloads/Replication 2/API_NY.GDP.PCAP.CD_DS2_en_excel_v2_281.xls", skip = 3)
 
 GDPPC_long <- GDPPC |>
   select(`Country Name`, `1971`:`2006`) |>
@@ -267,15 +267,49 @@ panel <- panel |>
   mutate(democratic_president = as.integer(year %in% c(1977:1980, 1993:2000)))
 
 # Generate real oil price
-oil_price <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/oil-prices-inflation-adjusted.csv") |>
+oil_price <- read_csv("/Users/aditpakala/Downloads/Replication 2/oil-prices-inflation-adjusted.csv") |>
   rename(year = Year, real_oil_price = `Oil price - Crude prices since 1861`) |>
   select(year, real_oil_price)
 
 panel <- panel |>
   left_join(oil_price, by = "year")
 
+# Generate US economic aid (net of food aid) and military aid
+foreign_aid <- read_csv("/Users/aditpakala/Downloads/Replication 2/US Foreign Aid - Economic and Military Aid.csv",
+                        skip = 6) |>
+  rename(
+    year        = `Fiscal Year`,
+    country     = Country,
+    category    = `Assistance Category`,
+    obligations = `Obligations (Constant Dollars)`
+  ) |>
+  filter(
+    category %in% c("Economic", "Military"),
+    year >= 1971, year <= 2006
+  ) |>
+  select(country, year, category, obligations) |>
+  group_by(country, year, category) |>
+  summarise(obligations = sum(obligations, na.rm = TRUE), .groups = "drop") |>
+  pivot_wider(
+    names_from  = category,
+    values_from = obligations,
+    names_prefix = "aid_"
+  ) |>
+  rename(
+    economic_aid = aid_Economic,
+    military_aid = aid_Military
+  )
+
+panel <- panel |>
+  left_join(foreign_aid, by = c("country", "year")) |>
+  mutate(
+    economic_aid = replace_na(economic_aid, 0),
+    military_aid = replace_na(military_aid, 0),
+    economic_aid = economic_aid - wheat_aid
+  )
+
 # Generate average per capita net imports of cereal
-cereal <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/Average Recipient Cereal - globalcereal_importexport.csv") |>
+cereal <- read_csv("/Users/aditpakala/Downloads/Replication 2/Average Recipient Cereal - globalcereal_importexport.csv") |>
   rename(country = Area, year = Year, m49 = `Area Code (M49)`, element = Element, value = Value) |>
   mutate(country = case_when(
     m49 == 68 ~ "Bolivia",
@@ -300,7 +334,7 @@ panel <- panel |>
   select(-net_imports_cereals)
 
 # Generate average per capita cereal production
-cereal_prod <- read_csv("C:/Users/aditr/Downloads/Replication Exercise 2/Average Recipient Cereal - globalcerealprod.csv") |>
+cereal_prod <- read_csv("/Users/aditpakala/Downloads/Replication 2/Average Recipient Cereal - globalcerealprod.csv") |>
   rename(country = Area, year = Year, m49 = `Area Code (M49)`, cereal_prod = Value) |>
   mutate(country = case_when(
     m49 == 68 ~ "Bolivia",
