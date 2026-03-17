@@ -182,27 +182,26 @@ panel <- panel |>
 # Import conflict data
 conflict <- read_excel("/Users/aditpakala/Downloads/Replication 2/2010_c_666956-l_1-k_ucdp_prio_armedconflictdataset_v4_2010.xls")
 
-# Reshape and create conflict indicators
 conflict_long <- conflict |>
   select(YEAR, SideA, SideB, Type) |>
   filter(YEAR >= 1971, YEAR <= 2006) |>
   pivot_longer(cols = c(SideA, SideB), names_to = "side", values_to = "country") |>
   select(year = YEAR, country, Type) |>
-  distinct(year, country, Type) |>
-  mutate(
-    has_conflict = 1,
-    has_intrastate = as.integer(Type %in% c(1, 2, 4)),
-    has_interstate = as.integer(Type == 3)
+  group_by(year, country) |>
+  summarise(
+    has_conflict   = 1,
+    has_intrastate = as.integer(any(Type %in% c(1, 2, 4))),
+    has_interstate = as.integer(any(Type == 3)),
+    .groups = "drop"
   )
 
 panel <- panel |>
   left_join(conflict_long, by = c("country", "year")) |>
   mutate(
-    has_conflict = replace_na(has_conflict, 0),
+    has_conflict   = replace_na(has_conflict, 0),
     has_intrastate = replace_na(has_intrastate, 0),
     has_interstate = replace_na(has_interstate, 0)
-  ) |>
-  select(-Type)
+  )
 
 # Generate food aid received
 food_aid <- read_csv("/Users/aditpakala/Downloads/Replication 2/US Food Aid - foodaid.csv") |>
@@ -378,6 +377,9 @@ us_rye_prod <- read_csv(
     us_rye_prod = as.numeric(str_remove_all(us_rye_prod, ","))
   ) |>
   filter(!is.na(year), year >= 1971, year <= 2006)
+
+panel <- panel |>
+  left_join(us_rye_prod, by = "year")
 
 # Sanity check
 panel |>
